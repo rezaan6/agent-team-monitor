@@ -26,31 +26,31 @@ Plus a rolling activity timeline and aggregate token/tool-use totals.
 
 - Sign in with email + password (Supabase auth, RLS-enforced data isolation)
 
-  ![Login](docs/media/login.gif)
+<p align="center"><img src="docs/media/login.gif" alt="Login" width="100%" /></p>
 
 - Dashboard with skeleton loading states while data hydrates
 
-  ![Dashboard](docs/media/dashboard.gif)
+<p align="center"><img src="docs/media/dashboard.gif" alt="Dashboard" width="100%" /></p>
 
 - User avatar menu with account details and sign-out
 
-  ![User menu](docs/media/user-menu.gif)
+<p align="center"><img src="docs/media/user-menu.gif" alt="User menu" width="100%" /></p>
 
 - Light / dark theme toggle
 
-  ![Dark mode](docs/media/dark-mode.gif)
+<p align="center"><img src="docs/media/dark-mode.gif" alt="Dark mode" width="100%" /></p>
 
 - Expandable agent cards showing per-tool-use events and usage
 
-  ![Agent card](docs/media/agent-card.gif)
+<p align="center"><img src="docs/media/agent-card.gif" alt="Agent card" width="100%" /></p>
 
 - Collapsible real-time activity timeline sidebar
 
-  ![Timeline](docs/media/timeline.gif)
+<p align="center"><img src="docs/media/timeline.gif" alt="Timeline" width="100%" /></p>
 
 - Collapsible Working / Completed / Failed sections
 
-  ![Sections](docs/media/sections.gif)
+<p align="center"><img src="docs/media/sections.gif" alt="Sections" width="100%" /></p>
 
 ## Architecture
 

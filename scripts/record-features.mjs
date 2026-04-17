@@ -274,7 +274,7 @@ async function recSections(page) {
 async function toGif(webmPath, name) {
   const out = resolve(MEDIA, `${name}.gif`);
   const palette = resolve(VIDEO_DIR, `${name}.palette.png`);
-  const filters = "fps=12,scale=480:-1:flags=lanczos";
+  const filters = "fps=12,scale=720:-1:flags=lanczos";
 
   await execFileP("ffmpeg", [
     "-y",
