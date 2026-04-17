@@ -19,7 +19,12 @@ create index if not exists stop_requests_user_idx on stop_requests (user_id);
 
 -- =============================================================================
 -- global_state: singleton -> per-user
+--   The pre-auth schema had a singleton row (id=1) with no user_id. Delete it
+--   before promoting user_id to NOT NULL PK — the trigger below will recreate
+--   a row per user as they're seeded.
 -- =============================================================================
+
+delete from global_state;
 
 alter table global_state drop constraint if exists global_state_pkey;
 alter table global_state drop constraint if exists global_state_id_check;
