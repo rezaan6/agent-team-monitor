@@ -32,6 +32,9 @@ hook.backup.sh
 # Stale nested-project copy at repo root (historical artifact)
 /agent-monitor/
 
+# Playwright recording intermediates (source webm/palette for docs/media GIFs)
+scripts/recordings/
+
 # OS / editor
 .DS_Store
 .vscode/

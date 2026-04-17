@@ -12,6 +12,46 @@ Live segregated view of every Claude Code sub-agent spawned from your sessions:
 
 Plus a rolling activity timeline and aggregate token/tool-use totals.
 
+## Technologies
+
+- [Next.js](https://nextjs.org/) (App Router, React 19)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Supabase](https://supabase.com/) (Postgres + Auth + Realtime + RLS)
+- [TailwindCSS](https://tailwindcss.com/)
+- [lucide-react](https://lucide.dev/) icons
+- [Vercel](https://vercel.com/) hosting
+- [Playwright](https://playwright.dev/) for feature recordings
+
+## Features (wait until GIFs load)
+
+- Sign in with email + password (Supabase auth, RLS-enforced data isolation)
+
+  ![Login](docs/media/login.gif)
+
+- Dashboard with skeleton loading states while data hydrates
+
+  ![Dashboard](docs/media/dashboard.gif)
+
+- User avatar menu with account details and sign-out
+
+  ![User menu](docs/media/user-menu.gif)
+
+- Light / dark theme toggle
+
+  ![Dark mode](docs/media/dark-mode.gif)
+
+- Expandable agent cards showing per-tool-use events and usage
+
+  ![Agent card](docs/media/agent-card.gif)
+
+- Collapsible real-time activity timeline sidebar
+
+  ![Timeline](docs/media/timeline.gif)
+
+- Collapsible Working / Completed / Failed sections
+
+  ![Sections](docs/media/sections.gif)
+
 ## Architecture
 
 ```
