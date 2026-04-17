@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAgentStream } from "@/hooks/use-agent-stream";
 import { Header } from "@/components/header";
 import { AgentCard } from "@/components/agent-card";
@@ -51,6 +51,18 @@ export default function Dashboard() {
   } = useAgentStream();
 
   const [showTimeline, setShowTimeline] = useState(true);
+  // Main's right gutter snaps open immediately but releases only after the
+  // sidebar's 300ms slide-out — so the card grid reflows exactly once per
+  // toggle, never per animation frame.
+  const [reserveGutter, setReserveGutter] = useState(true);
+  useEffect(() => {
+    if (showTimeline) {
+      setReserveGutter(true);
+      return;
+    }
+    const id = setTimeout(() => setReserveGutter(false), 300);
+    return () => clearTimeout(id);
+  }, [showTimeline]);
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
     working: true,
     completed: true,
@@ -79,7 +91,7 @@ export default function Dashboard() {
       />
 
       <div className="relative flex-1 overflow-hidden">
-        <main className={`h-full overflow-y-auto transition-[margin-right] duration-300 ease-out will-change-[margin-right] ${showTimeline ? "lg:mr-80" : ""}`}>
+        <main className={`h-full overflow-y-auto ${reserveGutter ? "lg:mr-80" : ""}`}>
           <div className="px-6 pt-5 pb-0">
             {/* Summary card */}
             {isInitialLoading ? (
