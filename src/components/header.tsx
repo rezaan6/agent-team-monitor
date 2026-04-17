@@ -11,12 +11,13 @@ interface HeaderProps {
 }
 
 export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [sessionAge, setSessionAge] = useState("");
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
+    setCurrentTime(new Date());
   }, []);
 
   const toggleTheme = () => {
@@ -53,8 +54,8 @@ export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
 
         {/* Right: Time + Theme toggle */}
         <div className="flex items-center gap-3">
-          <div className="hidden text-right text-[11px] text-gray-500 dark:text-gray-400 sm:block">
-            <span>{formatTime(currentTime)}</span>
+          <div suppressHydrationWarning className="hidden text-right text-[11px] text-gray-500 dark:text-gray-400 sm:block">
+            {currentTime && <span>{formatTime(currentTime)}</span>}
             {sessionAge && (
               <span className="ml-2 text-gray-400 dark:text-gray-500">
                 Session {sessionAge}
