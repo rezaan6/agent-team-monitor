@@ -1,25 +1,32 @@
 #!/bin/bash
 # Claude Code activity hook — forwards per-tool-use summaries to the monitor.
 #
-# Configure MONITOR_URL to your deployed Vercel URL. Falls back to localhost.
-#
-# Usage in settings.json hooks:
-#   PreToolUse:  bash ~/agent-team-monitor/scripts/activity-hook.sh pre
-#   PostToolUse: bash ~/agent-team-monitor/scripts/activity-hook.sh post
+# Required env (set via .claude/settings.json "env"):
+#   MONITOR_URL            e.g. https://agent-team-monitor-ten.vercel.app
+#   MONITOR_INGEST_TOKEN   the plaintext token printed by scripts/seed-users.mjs
+# Optional:
+#   MONITOR_PROJECT        short tag identifying the repo
 
 PHASE="${1:-pre}"
 BASE="${MONITOR_URL:-http://localhost:7777}"
 ENDPOINT="${BASE%/}/api/activity"
+PROJECT="${MONITOR_PROJECT:-}"
+TOKEN="${MONITOR_INGEST_TOKEN:-}"
+
+if [ -z "$TOKEN" ]; then
+  exit 0
+fi
 
 TMPFILE=$(mktemp)
 cat > "$TMPFILE"
 
-export PHASE TMPFILE
+export PHASE TMPFILE PROJECT
 PAYLOAD=$(/usr/bin/python3 << 'PYEOF'
 import sys, json, os
 
 phase = os.environ.get("PHASE", "pre")
 tmpfile = os.environ.get("TMPFILE", "")
+project = os.environ.get("PROJECT", "")
 
 try:
     with open(tmpfile) as f:
@@ -58,12 +65,15 @@ elif tool_name == "WebSearch":
 else:
     summary = tool_name
 
-print(json.dumps({
+out = {
     "phase": phase,
     "tool_name": tool_name,
     "session_id": session_id,
     "summary": summary,
-}))
+}
+if project:
+    out["project"] = project
+print(json.dumps(out))
 PYEOF
 )
 
@@ -75,6 +85,7 @@ fi
 
 curl -s -m 2 -X POST "$ENDPOINT" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d "$PAYLOAD" > /dev/null 2>&1 &
 
 exit 0

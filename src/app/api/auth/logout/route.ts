@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { getInitialSnapshot } from "@/lib/agents/db";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function POST() {
   const supabase = await getSupabaseServerClient();
-  const snapshot = await getInitialSnapshot(supabase);
-  return NextResponse.json(snapshot);
+  await supabase.auth.signOut();
+  return NextResponse.json({ ok: true });
 }

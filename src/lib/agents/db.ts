@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Agent, AgentActivity } from "@/lib/types";
 
@@ -7,6 +8,8 @@ import type { Agent, AgentActivity } from "@/lib/types";
 
 interface AgentRow {
   id: number;
+  user_id: string | null;
+  project: string | null;
   description: string;
   prompt: string;
   subagent_type: string;
@@ -55,6 +58,7 @@ export function rowToAgent(row: AgentRow): Agent {
 
 export interface HookPayload {
   phase: "pre" | "post";
+  project?: string;
   tool_input?: {
     description?: string;
     prompt?: string;
@@ -68,12 +72,13 @@ export interface HookPayload {
 
 export interface ActivityPayload {
   phase?: string;
+  project?: string;
   tool_name?: string;
   summary?: string;
   session_id?: string;
 }
 
-// --- Usage parsing (copied from server.mjs) ---
+// --- Usage parsing ---
 
 function parseUsage(toolResult: string | undefined) {
   if (!toolResult) return null;
@@ -91,16 +96,14 @@ function parseUsage(toolResult: string | undefined) {
   };
 }
 
-// Sweep any background "running" agents that haven't had activity for 30s.
-// Called opportunistically on every write — replaces the per-agent timer
-// that lived in-memory in the old Express server.
-async function sweepStaleBackgroundAgents() {
+async function sweepStaleBackgroundAgents(userId: string) {
   const supabase = getSupabaseAdminClient();
   const cutoff = new Date(Date.now() - INACTIVITY_TIMEOUT_MS).toISOString();
 
   const { data: stale } = await supabase
     .from("agents")
     .select("id, started_at, last_activity_at")
+    .eq("user_id", userId)
     .eq("status", "running")
     .eq("background", true)
     .lt("last_activity_at", cutoff);
@@ -123,6 +126,7 @@ async function sweepStaleBackgroundAgents() {
     await supabase.from("agent_events").insert({
       type: "agent_completed",
       agent_id: row.id,
+      user_id: userId,
       payload: { reason: "inactivity_timeout" },
     });
   }
@@ -130,20 +134,25 @@ async function sweepStaleBackgroundAgents() {
 
 // --- Hook event (Agent tool pre/post) ---
 
-export async function processHookEvent(hook: HookPayload) {
+export async function processHookEvent(
+  hook: HookPayload,
+  userId: string,
+  project: string | null
+) {
   const supabase = getSupabaseAdminClient();
   const toolInput = hook.tool_input ?? {};
   const description = toolInput.description || "unnamed agent";
   const sessionId = hook.session_id || "unknown";
   const nowIso = new Date().toISOString();
 
-  // Opportunistic cleanup
-  await sweepStaleBackgroundAgents();
+  await sweepStaleBackgroundAgents(userId);
 
   if (hook.phase === "pre") {
     const { data: inserted, error } = await supabase
       .from("agents")
       .insert({
+        user_id: userId,
+        project,
         description,
         prompt: (toolInput.prompt || "").slice(0, 500),
         subagent_type: toolInput.subagent_type || "general-purpose",
@@ -160,39 +169,35 @@ export async function processHookEvent(hook: HookPayload) {
     await supabase.from("agent_events").insert({
       type: "agent_started",
       agent_id: inserted.id,
+      user_id: userId,
+      project,
       payload: { agent: rowToAgent(inserted) },
     });
 
-    // New agent becomes the active one for activity attribution
     await supabase
       .from("global_state")
       .update({ active_agent_id: inserted.id, last_activity_ts: nowIso })
-      .eq("id", 1);
+      .eq("user_id", userId);
 
     return { agentId: inserted.id };
   }
 
-  // --- post phase: find the matching running agent ---
-
   const { data: matches } = await supabase
     .from("agents")
     .select("*")
+    .eq("user_id", userId)
     .eq("status", "running")
     .eq("description", description)
     .order("started_at", { ascending: true });
 
   if (!matches || matches.length === 0) return {};
 
-  // Prefer the one with matching session_id
-  let agent =
+  const agent =
     matches.find((a) => a.session_id === sessionId) ?? matches[0];
 
   const startedAtMs = new Date(agent.started_at).getTime();
   const elapsedMs = Date.now() - startedAtMs;
 
-  // Background agents: PostToolUse fires immediately when spawned, not when
-  // the agent actually finishes.  If the post arrives <3s after the pre,
-  // keep it running — the inactivity sweep will complete it later.
   if (agent.background && elapsedMs < 3000 && !hook.error) {
     await supabase
       .from("agents")
@@ -205,7 +210,6 @@ export async function processHookEvent(hook: HookPayload) {
   const usage = parseUsage(toolResult);
   const status: "completed" | "error" = hook.error ? "error" : "completed";
 
-  // Build update patch
   const patch: Partial<AgentRow> = {
     status,
     completed_at: nowIso,
@@ -225,12 +229,11 @@ export async function processHookEvent(hook: HookPayload) {
 
   if (!updated) return {};
 
-  // Accumulate global totals
   if (usage) {
     const { data: gs } = await supabase
       .from("global_state")
       .select("total_tokens, total_tool_uses, total_duration_ms")
-      .eq("id", 1)
+      .eq("user_id", userId)
       .single();
 
     await supabase
@@ -240,12 +243,14 @@ export async function processHookEvent(hook: HookPayload) {
         total_tool_uses: (gs?.total_tool_uses ?? 0) + usage.toolUses,
         total_duration_ms: (gs?.total_duration_ms ?? 0) + usage.durationMs,
       })
-      .eq("id", 1);
+      .eq("user_id", userId);
   }
 
   await supabase.from("agent_events").insert({
     type: "agent_completed",
     agent_id: agent.id,
+    user_id: userId,
+    project,
     payload: { agent: rowToAgent(updated) },
   });
 
@@ -254,7 +259,7 @@ export async function processHookEvent(hook: HookPayload) {
 
 // --- Activity (tool-use within an agent) ---
 
-export async function processActivity(data: ActivityPayload) {
+export async function processActivity(data: ActivityPayload, userId: string) {
   if (data.phase !== "pre") return;
   const toolName = data.tool_name || "";
   const summary = data.summary || toolName;
@@ -263,11 +268,12 @@ export async function processActivity(data: ActivityPayload) {
 
   const supabase = getSupabaseAdminClient();
 
-  await sweepStaleBackgroundAgents();
+  await sweepStaleBackgroundAgents(userId);
 
   const { data: running } = await supabase
     .from("agents")
     .select("*")
+    .eq("user_id", userId)
     .eq("status", "running")
     .order("started_at", { ascending: true });
 
@@ -280,7 +286,7 @@ export async function processActivity(data: ActivityPayload) {
     const { data: gs } = await supabase
       .from("global_state")
       .select("active_agent_id, last_activity_ts")
-      .eq("id", 1)
+      .eq("user_id", userId)
       .single();
 
     const current = gs?.active_agent_id
@@ -294,7 +300,6 @@ export async function processActivity(data: ActivityPayload) {
     if (current && gap < ROTATION_GAP_MS) {
       target = current;
     } else {
-      // Rotate: pick the running agent with the fewest recorded steps
       let best = running[0];
       let fewest = Infinity;
       for (const a of running) {
@@ -323,43 +328,19 @@ export async function processActivity(data: ActivityPayload) {
   await supabase
     .from("global_state")
     .update({ active_agent_id: target.id, last_activity_ts: nowIso })
-    .eq("id", 1);
+    .eq("user_id", userId);
 }
 
-// --- Stop / clear ---
+// --- Pending stop signals (polled by local hook scripts, scoped per user) ---
 
-export async function requestStop(agentId: number) {
-  const supabase = getSupabaseAdminClient();
-  await supabase.from("stop_requests").insert({ agent_id: agentId });
-}
-
-export async function clearAllState() {
-  const supabase = getSupabaseAdminClient();
-  await supabase.from("agent_events").delete().gt("id", 0);
-  await supabase.from("agents").delete().gt("id", 0);
-  await supabase.from("stop_requests").delete().gt("id", 0);
-  await supabase
-    .from("global_state")
-    .update({
-      total_tokens: 0,
-      total_tool_uses: 0,
-      total_duration_ms: 0,
-      session_started_at: new Date().toISOString(),
-      active_agent_id: null,
-      last_activity_ts: null,
-    })
-    .eq("id", 1);
-}
-
-// --- Pending stop signals (polled by local hook scripts) ---
-
-export async function fetchAndConsumePendingStops(): Promise<number[]> {
+export async function fetchAndConsumePendingStops(userId: string): Promise<number[]> {
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
 
   const { data: pending } = await supabase
     .from("stop_requests")
     .select("id, agent_id")
+    .eq("user_id", userId)
     .is("consumed_at", null)
     .order("requested_at", { ascending: true });
 
@@ -374,11 +355,56 @@ export async function fetchAndConsumePendingStops(): Promise<number[]> {
   return pending.map((p) => p.agent_id);
 }
 
-// --- Initial state snapshot (dashboard loads this on mount) ---
+// =============================================================================
+// Dashboard path — uses the user-scoped SSR client. RLS enforces isolation;
+// even a buggy query here cannot return another user's rows.
+// =============================================================================
 
-export async function getInitialSnapshot() {
-  const supabase = getSupabaseAdminClient();
+export async function requestStop(supabase: SupabaseClient, agentId: number) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthenticated");
 
+  // RLS SELECT policy ensures this only matches the current user's agents.
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("id", agentId)
+    .maybeSingle();
+
+  if (!agent) throw new Error("agent not found");
+
+  const admin = getSupabaseAdminClient();
+  await admin
+    .from("stop_requests")
+    .insert({ agent_id: agentId, user_id: user.id });
+}
+
+export async function clearAllState(supabase: SupabaseClient) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthenticated");
+
+  const admin = getSupabaseAdminClient();
+  await admin.from("agent_events").delete().eq("user_id", user.id);
+  await admin.from("agents").delete().eq("user_id", user.id);
+  await admin.from("stop_requests").delete().eq("user_id", user.id);
+  await admin
+    .from("global_state")
+    .update({
+      total_tokens: 0,
+      total_tool_uses: 0,
+      total_duration_ms: 0,
+      session_started_at: new Date().toISOString(),
+      active_agent_id: null,
+      last_activity_ts: null,
+    })
+    .eq("user_id", user.id);
+}
+
+export async function getInitialSnapshot(supabase: SupabaseClient) {
   const [agentsRes, eventsRes, gsRes] = await Promise.all([
     supabase.from("agents").select("*").order("started_at", { ascending: true }),
     supabase
@@ -386,7 +412,7 @@ export async function getInitialSnapshot() {
       .select("*")
       .order("timestamp", { ascending: true })
       .limit(200),
-    supabase.from("global_state").select("*").eq("id", 1).single(),
+    supabase.from("global_state").select("*").maybeSingle(),
   ]);
 
   return {
