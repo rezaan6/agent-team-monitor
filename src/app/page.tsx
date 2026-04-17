@@ -6,6 +6,7 @@ import { Header } from "@/components/header";
 import { AgentCard } from "@/components/agent-card";
 import { Timeline } from "@/components/timeline";
 import { ToastContainer } from "@/components/toast";
+import { AgentGridSkeleton, SummarySkeleton, TimelineSkeleton } from "@/components/skeletons";
 import { Activity, PanelRightClose, PanelRightOpen, Loader2, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
 import type { Agent } from "@/lib/types";
 
@@ -59,6 +60,8 @@ export default function Dashboard() {
   const toggleSection = (key: string) =>
     setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const isInitialLoading = connectionStatus === "connecting" && agents.size === 0;
+
   const allAgents = Array.from(agents.values());
   const running = allAgents.filter((a) => a.status === "running");
   const finished = allAgents
@@ -79,23 +82,28 @@ export default function Dashboard() {
         <main className={`h-full overflow-y-auto transition-[margin-right] duration-300 ease-out will-change-[margin-right] ${showTimeline ? "lg:mr-80" : ""}`}>
           <div className="px-6 pt-5 pb-0">
             {/* Summary card */}
-            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-5 py-4 animate-in fade-in-scale duration-300">
-              <div className="flex items-start justify-between gap-4">
-                <p className="max-h-20 overflow-y-auto text-sm leading-relaxed text-gray-600 dark:text-gray-400">{summarizeActivity(agents)}</p>
-                {running.length > 0 && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-600/10 dark:ring-blue-400/10 animate-in fade-in duration-300">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+            {isInitialLoading ? (
+              <SummarySkeleton />
+            ) : (
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-5 py-4 animate-in fade-in-scale duration-300">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="max-h-20 overflow-y-auto text-sm leading-relaxed text-gray-600 dark:text-gray-400">{summarizeActivity(agents)}</p>
+                  {running.length > 0 && (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-600/10 dark:ring-blue-400/10 animate-in fade-in duration-300">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      </span>
+                      {running.length} active
                     </span>
-                    {running.length} active
-                  </span>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="px-6 py-5 space-y-5">
+            {isInitialLoading && <AgentGridSkeleton count={6} />}
             {/* Active agents — always open, always on top */}
             {running.length > 0 && (
               <section className="animate-in fade-in-up duration-300">
@@ -162,7 +170,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {allAgents.length === 0 && (
+            {allAgents.length === 0 && !isInitialLoading && (
               <div className="flex h-64 flex-col items-center justify-center text-center animate-in fade-in duration-500">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                   <Activity className="h-6 w-6 text-gray-400 dark:text-gray-500" />
@@ -176,7 +184,7 @@ export default function Dashboard() {
 
             {/* Mobile timeline */}
             <div className="lg:hidden">
-              <Timeline events={events} />
+              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} />}
             </div>
           </div>
         </main>
@@ -206,7 +214,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <Timeline events={events} embedded />
+              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} embedded />}
             </div>
           </div>
         </aside>

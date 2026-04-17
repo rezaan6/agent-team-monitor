@@ -138,6 +138,19 @@ async function main() {
     return;
   }
 
+  // Remove pre-auth orphan rows (user_id IS NULL) left over from the old
+  // single-user schema. They're invisible under RLS and only serve to block
+  // ID reuse during import.
+  const { count: orphans } = await supabase
+    .from("agents")
+    .select("*", { count: "exact", head: true })
+    .is("user_id", null);
+  if ((orphans ?? 0) > 0) {
+    console.log(`clearing ${orphans} pre-auth orphan rows…`);
+    await supabase.from("agent_events").delete().is("user_id", null);
+    await supabase.from("agents").delete().is("user_id", null);
+  }
+
   if (WIPE) {
     console.log("wiping existing rows for this user…");
     await supabase.from("agent_events").delete().eq("user_id", adminId);

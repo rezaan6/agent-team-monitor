@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, WifiOff, Moon, Sun, LogOut } from "lucide-react";
+import { Loader2, WifiOff, Moon, Sun } from "lucide-react";
 import { formatTime, formatTimeAgo } from "@/lib/formatters";
 import type { ConnectionStatus } from "@/hooks/use-agent-stream";
+import { UserMenu } from "@/components/user-menu";
 
 interface HeaderProps {
   connectionStatus: ConnectionStatus;
@@ -12,16 +12,9 @@ interface HeaderProps {
 }
 
 export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
-  const router = useRouter();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [sessionAge, setSessionAge] = useState("");
   const [dark, setDark] = useState(false);
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -77,13 +70,7 @@ export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
           >
             {dark ? <Sun className="h-4 w-4 transition-transform duration-300 hover:rotate-45" /> : <Moon className="h-4 w-4 transition-transform duration-300 hover:-rotate-12" />}
           </button>
-          <button
-            onClick={logout}
-            className="cursor-pointer rounded-lg p-1.5 text-gray-400 transition-[background-color,color,transform] duration-150 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 active:scale-95"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <UserMenu />
         </div>
       </div>
     </header>
