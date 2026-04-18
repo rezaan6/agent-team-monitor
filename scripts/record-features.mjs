@@ -62,19 +62,54 @@ const CURSOR_SCRIPT = `
 })();
 `;
 
-async function freshContext(browser) {
+async function freshContext(browser, { storageState } = {}) {
   // Each clip gets its own context so Playwright writes a single .webm we
-  // can identify by save order.
+  // can identify by save order. `storageState` (set for authed clips) skips
+  // the login pre-roll by restoring the Supabase session cookies/localStorage.
   const context = await browser.newContext({
     viewport: VIEWPORT,
     recordVideo: { dir: VIDEO_DIR, size: VIEWPORT },
     colorScheme: "light",
+    storageState,
   });
   // Inject a fake cursor into every page so the recording shows where the
   // automated mouse is pointing — Playwright doesn't render the OS cursor
   // into its videos.
   await context.addInitScript(CURSOR_SCRIPT);
   return context;
+}
+
+// Animate a CSS transform on <body> so `locator` is panned to the viewport
+// centre and scaled up. The fake cursor lives on <html> so it stays at true
+// viewport coords, while page.mouse.move and locator.boundingBox both report
+// post-transform coords — so circle()/click() work normally after a zoom.
+async function zoom(page, locator, { scale = 1.7, duration = 550 } = {}) {
+  const box = await locator.boundingBox();
+  if (!box) return;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const shiftX = VIEWPORT.width / 2 - cx * scale;
+  const shiftY = VIEWPORT.height / 2 - cy * scale;
+  await page.evaluate(
+    ({ shiftX, shiftY, scale, duration }) => {
+      const b = document.body;
+      b.style.transformOrigin = "0 0";
+      b.style.transition = `transform ${duration}ms cubic-bezier(0.22, 0.9, 0.3, 1)`;
+      b.style.willChange = "transform";
+      b.style.transform = `translate(${shiftX}px, ${shiftY}px) scale(${scale})`;
+    },
+    { shiftX, shiftY, scale, duration },
+  );
+  await page.waitForTimeout(duration + 80);
+}
+
+async function unzoom(page, { duration = 450 } = {}) {
+  await page.evaluate((duration) => {
+    const b = document.body;
+    b.style.transition = `transform ${duration}ms ease`;
+    b.style.transform = "none";
+  }, duration);
+  await page.waitForTimeout(duration + 60);
 }
 
 async function moveTo(page, x, y, steps = 20) {
@@ -115,9 +150,9 @@ async function signIn(page) {
   await page.waitForTimeout(1500);
 }
 
-async function clip(name, browser, fn) {
+async function clip(name, browser, fn, { storageState } = {}) {
   console.log(`  → recording ${name}`);
-  const context = await freshContext(browser);
+  const context = await freshContext(browser, { storageState });
   const page = await context.newPage();
   try {
     await fn(page);
@@ -176,14 +211,20 @@ async function recLogin(page) {
   await page.waitForTimeout(1500);
 }
 
+// Authed clips skip the login pre-roll: storageState is restored at context
+// creation, so the very first navigation lands directly on the dashboard.
+async function goToDashboard(page) {
+  await page.goto(BASE, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("header", { timeout: 15_000 });
+  await page.waitForTimeout(700);
+}
+
 async function recDashboard(page) {
-  // Show the skeleton-to-loaded transition: sign in, then immediately reload
-  // so the fresh page renders skeletons while data hydrates.
-  await signIn(page);
-  await page.reload({ waitUntil: "commit" });
+  // The first paint shows skeletons while data hydrates — exactly what we
+  // want to demonstrate, no reload needed.
+  await page.goto(BASE, { waitUntil: "commit" });
   await moveTo(page, 640, 400, 1);
-  await page.waitForTimeout(800);
-  // Sweep the cursor across the dashboard to guide the eye while it hydrates.
+  await page.waitForTimeout(700);
   await moveTo(page, 240, 220);
   await moveTo(page, 1040, 220);
   await moveTo(page, 1040, 560);
@@ -192,79 +233,82 @@ async function recDashboard(page) {
 }
 
 async function recUserMenu(page) {
-  await signIn(page);
+  await goToDashboard(page);
   const trigger = page.locator("header button[title]").last();
+  await page.waitForTimeout(400);
+  await zoom(page, trigger, { scale: 2.0 });
   await circle(page, trigger);
   await trigger.click();
   await page.waitForTimeout(1800);
-  // Close and settle.
-  await moveTo(page, 400, 400);
-  await page.mouse.click(400, 400);
-  await page.waitForTimeout(600);
+  await unzoom(page);
 }
 
 async function recDarkMode(page) {
-  await signIn(page);
-  const themeBtn = page
-    .locator('header button[title*="mode"]')
-    .first();
+  await goToDashboard(page);
+  const themeBtn = page.locator('header button[title*="mode"]').first();
+  await page.waitForTimeout(400);
+  await zoom(page, themeBtn, { scale: 2.0 });
   await circle(page, themeBtn);
   await themeBtn.click();
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(900);
   await themeBtn.click();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(900);
+  await unzoom(page);
 }
 
 async function recAgentCard(page) {
-  await signIn(page);
-  // Click the first expand chevron in the Completed section.
+  await goToDashboard(page);
   const firstCard = page.locator("section h3").first();
   await firstCard.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
-  // The AgentCard has a chevron toggle; click the card body to expand.
+  await page.waitForTimeout(500);
   const expandable = page
     .locator('[class*="cursor-pointer"]')
     .filter({ hasText: /^#/ })
     .first();
-  try {
-    await circle(page, expandable);
-    await expandable.click({ timeout: 3000 });
-  } catch {
-    // Fallback: click first card container.
-    await circle(page, firstCard);
-    await firstCard.click();
-  }
+  const target = (await expandable.count()) ? expandable : firstCard;
+  await zoom(page, target, { scale: 1.5 });
+  await circle(page, target);
+  await target.click({ timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(2500);
+  await unzoom(page);
 }
 
 async function recTimeline(page) {
-  await signIn(page);
-  // Close the timeline sidebar, then reopen.
+  await goToDashboard(page);
+  await page.waitForTimeout(500);
+  // Zoom on the close button itself so it stays at viewport centre and
+  // remains clickable, then zoom out for the slide-out, then zoom on the
+  // re-open button.
   const closeBtn = page.locator('aside button[class*="rounded-md"]').first();
   if (await closeBtn.isVisible().catch(() => false)) {
+    await zoom(page, closeBtn, { scale: 1.6 });
     await circle(page, closeBtn);
     await closeBtn.click();
-    await page.waitForTimeout(1200);
+    await unzoom(page);
+    await page.waitForTimeout(800);
   }
   const openBtn = page.locator('button:has-text("Activity")').first();
   if (await openBtn.isVisible().catch(() => false)) {
+    await zoom(page, openBtn, { scale: 1.8 });
     await circle(page, openBtn);
     await openBtn.click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1200);
+    await unzoom(page);
   }
 }
 
 async function recSections(page) {
-  await signIn(page);
-  // Collapse Completed, then Failed, then reopen.
+  await goToDashboard(page);
   const completed = page.locator('button:has-text("Completed")').first();
   await completed.scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
+  await zoom(page, completed, { scale: 1.5 });
   await circle(page, completed);
   await completed.click();
   await page.waitForTimeout(1000);
   await completed.click();
   await page.waitForTimeout(1000);
+  await unzoom(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,18 +355,27 @@ async function main() {
   console.log(`recording against ${BASE} as ${EMAIL}`);
   const browser = await chromium.launch();
   try {
+    // Sign in once outside any recording so authed clips can start on the
+    // dashboard instead of replaying the login form on every video.
+    console.log("priming auth state…");
+    const authCtx = await browser.newContext({ viewport: VIEWPORT, colorScheme: "light" });
+    const authPage = await authCtx.newPage();
+    await signIn(authPage);
+    const authState = await authCtx.storageState();
+    await authCtx.close();
+
     const clips = [
-      ["login", recLogin],
-      ["dashboard", recDashboard],
-      ["user-menu", recUserMenu],
-      ["dark-mode", recDarkMode],
-      ["agent-card", recAgentCard],
-      ["timeline", recTimeline],
-      ["sections", recSections],
+      ["login", recLogin, {}],
+      ["dashboard", recDashboard, { storageState: authState }],
+      ["user-menu", recUserMenu, { storageState: authState }],
+      ["dark-mode", recDarkMode, { storageState: authState }],
+      ["agent-card", recAgentCard, { storageState: authState }],
+      ["timeline", recTimeline, { storageState: authState }],
+      ["sections", recSections, { storageState: authState }],
     ];
     const webms = [];
-    for (const [name, fn] of clips) {
-      const webm = await clip(name, browser, fn);
+    for (const [name, fn, opts] of clips) {
+      const webm = await clip(name, browser, fn, opts);
       webms.push([name, webm]);
     }
 
