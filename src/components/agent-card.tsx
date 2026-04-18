@@ -40,7 +40,7 @@ export function AgentCard({ agent, onStop }: AgentCardProps) {
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl border bg-white dark:bg-gray-900 transition-[border-color,box-shadow] duration-300 animate-in fade-in-up ${
+      className={`group relative overflow-hidden rounded-xl border bg-white dark:bg-gray-900 transition-[border-color,box-shadow] duration-300 animate-in fade-in-up [content-visibility:auto] [contain-intrinsic-size:200px] ${
         agent.status === "running"
           ? "border-blue-200/60 dark:border-blue-800/60 shadow-sm shadow-blue-100/50 dark:shadow-blue-900/20"
           : agent.status === "error"
