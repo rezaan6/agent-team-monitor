@@ -94,6 +94,18 @@ export function useAgentStream() {
     let channel: RealtimeChannel | null = null;
     const supabase = getSupabaseBrowserClient();
 
+    // Keep realtime auth in sync with the Supabase session. On production
+    // builds, the session can hydrate from cookies after this effect runs,
+    // so we re-apply the JWT via setAuth whenever the auth state changes so
+    // RLS-protected postgres_changes frames pass through.
+    const { data: authSub } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (newSession?.access_token) {
+          supabase.realtime.setAuth(newSession.access_token);
+        }
+      }
+    );
+
     async function hydrate() {
       setConnectionStatus("connecting");
       try {
@@ -135,8 +147,19 @@ export function useAgentStream() {
       }
     }
 
-    hydrate().then(() => {
+    hydrate().then(async () => {
       if (cancelled) return;
+
+      // Ensure the realtime socket has the current JWT before subscribing.
+      // Without this, on production the WebSocket can connect anonymously
+      // and RLS filters out every postgres_changes frame.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token);
+      }
 
       channel = supabase
         .channel("agent-monitor")
@@ -206,6 +229,7 @@ export function useAgentStream() {
 
     return () => {
       cancelled = true;
+      authSub.subscription.unsubscribe();
       if (channel) supabase.removeChannel(channel);
     };
   }, [addToast]);
