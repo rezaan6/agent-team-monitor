@@ -32,6 +32,14 @@ const INACTIVITY_TIMEOUT_MS = 30_000;
 // Gap-based rotation: if the last tool-use was within this window we keep
 // attributing to the same agent; otherwise rotate.
 const ROTATION_GAP_MS = 500;
+// Pre-spawn dedupe window: a single Agent tool invocation must never create
+// more than one row. Claude Code hook configs occasionally fire PreToolUse
+// twice (e.g. the same "Agent" matcher is defined at both user and project
+// level, or an `.*` matcher overlaps an `Agent` matcher), which produces two
+// POSTs to /api/hook within a few ms. Any pre event arriving this soon after
+// an identical (session_id, description) running agent is treated as the
+// echo of the same spawn and reuses the existing row.
+const PRE_DEDUPE_WINDOW_MS = 5_000;
 
 // --- Mappers ---
 
@@ -148,6 +156,29 @@ export async function processHookEvent(
   await sweepStaleBackgroundAgents(userId);
 
   if (hook.phase === "pre") {
+    // Dedupe: if an identical running agent was just inserted for this
+    // (user, session, description) pair, reuse it instead of inserting a
+    // second row. Guards against hook configs that fire PreToolUse twice
+    // for the same Agent spawn (e.g. overlapping matchers at user + project
+    // scope), which would otherwise render two cards for one invocation.
+    const dedupeCutoff = new Date(
+      Date.now() - PRE_DEDUPE_WINDOW_MS
+    ).toISOString();
+    const { data: recent } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("session_id", sessionId)
+      .eq("description", description)
+      .eq("status", "running")
+      .gte("started_at", dedupeCutoff)
+      .order("started_at", { ascending: false })
+      .limit(1);
+
+    if (recent && recent.length > 0) {
+      return { agentId: recent[0].id, deduped: true };
+    }
+
     const { data: inserted, error } = await supabase
       .from("agents")
       .insert({

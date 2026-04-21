@@ -58,7 +58,32 @@ export default function Dashboard() {
 
   const isInitialLoading = connectionStatus === "connecting" && agents.size === 0;
 
-  const allAgents = Array.from(agents.values());
+  // Render-layer dedupe: if two rows with different ids share the same
+  // (sessionId, description) and started within 5s of each other, they
+  // represent the same spawn that leaked past the server-side dedupe (e.g.
+  // an existing row from before the dedupe was deployed). Keep the earliest
+  // id so the visible card stays stable.
+  const DEDUPE_WINDOW_MS = 5_000;
+  const rawAgents = Array.from(agents.values());
+  const dedupeKey = (a: Agent) =>
+    `${a.sessionId ?? "unknown"}::${a.description}`;
+  const keeperById = new Map<string, Agent>();
+  for (const a of rawAgents) {
+    const key = dedupeKey(a);
+    const existing = keeperById.get(key);
+    if (!existing) {
+      keeperById.set(key, a);
+      continue;
+    }
+    const aStart = new Date(a.startedAt).getTime();
+    const exStart = new Date(existing.startedAt).getTime();
+    const withinWindow = Math.abs(aStart - exStart) < DEDUPE_WINDOW_MS;
+    if (!withinWindow) continue;
+    // Prefer the lowest-id row as the canonical one, since it was the
+    // winner of the server-side dedupe race.
+    if (a.id < existing.id) keeperById.set(key, a);
+  }
+  const allAgents = Array.from(keeperById.values());
   const running = allAgents.filter((a) => a.status === "running");
   const finished = allAgents
     .filter((a) => a.status === "completed")
