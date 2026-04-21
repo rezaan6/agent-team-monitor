@@ -6,10 +6,9 @@ import { AgentCard } from "./agent-card";
 
 interface AgentGridProps {
   agents: Map<number, Agent>;
-  onStop: (id: number) => void;
 }
 
-export function AgentGrid({ agents, onStop }: AgentGridProps) {
+export function AgentGrid({ agents }: AgentGridProps) {
   const sortedAgents = Array.from(agents.values()).sort((a, b) => {
     // Running agents first, then by most recent
     if (a.status === "running" && b.status !== "running") return -1;
@@ -32,7 +31,7 @@ export function AgentGrid({ agents, onStop }: AgentGridProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {sortedAgents.map((agent) => (
-        <AgentCard key={agent.id} agent={agent} onStop={onStop} />
+        <AgentCard key={agent.id} agent={agent} />
       ))}
     </div>
   );

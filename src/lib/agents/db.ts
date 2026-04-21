@@ -331,64 +331,10 @@ export async function processActivity(data: ActivityPayload, userId: string) {
     .eq("user_id", userId);
 }
 
-// --- Pending stop signals (polled by local hook scripts, scoped per user) ---
-
-export interface PendingStop {
-  agentId: number;
-  sessionId: string | null;
-}
-
-export async function fetchAndConsumePendingStops(userId: string): Promise<PendingStop[]> {
-  const supabase = getSupabaseAdminClient();
-  const nowIso = new Date().toISOString();
-
-  const { data: pending } = await supabase
-    .from("stop_requests")
-    .select("id, agent_id, agents:agent_id(session_id)")
-    .eq("user_id", userId)
-    .is("consumed_at", null)
-    .order("requested_at", { ascending: true });
-
-  if (!pending || pending.length === 0) return [];
-
-  const ids = pending.map((p) => p.id);
-  await supabase
-    .from("stop_requests")
-    .update({ consumed_at: nowIso })
-    .in("id", ids);
-
-  type Row = { agent_id: number; agents: { session_id: string | null } | null };
-  return (pending as unknown as Row[]).map((p) => ({
-    agentId: p.agent_id,
-    sessionId: p.agents?.session_id ?? null,
-  }));
-}
-
 // =============================================================================
 // Dashboard path — uses the user-scoped SSR client. RLS enforces isolation;
 // even a buggy query here cannot return another user's rows.
 // =============================================================================
-
-export async function requestStop(supabase: SupabaseClient, agentId: number) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("unauthenticated");
-
-  // RLS SELECT policy ensures this only matches the current user's agents.
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("id")
-    .eq("id", agentId)
-    .maybeSingle();
-
-  if (!agent) throw new Error("agent not found");
-
-  const admin = getSupabaseAdminClient();
-  await admin
-    .from("stop_requests")
-    .insert({ agent_id: agentId, user_id: user.id });
-}
 
 export async function clearAllState(supabase: SupabaseClient) {
   const {
@@ -399,7 +345,6 @@ export async function clearAllState(supabase: SupabaseClient) {
   const admin = getSupabaseAdminClient();
   await admin.from("agent_events").delete().eq("user_id", user.id);
   await admin.from("agents").delete().eq("user_id", user.id);
-  await admin.from("stop_requests").delete().eq("user_id", user.id);
   await admin
     .from("global_state")
     .update({

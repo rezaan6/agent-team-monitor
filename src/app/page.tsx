@@ -43,7 +43,6 @@ export default function Dashboard() {
     sessionStartedAt,
     connectionStatus,
     stats,
-    stopAgent,
     clearAll,
   } = useAgentStream();
 
@@ -113,7 +112,7 @@ export default function Dashboard() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {running.map((agent) => (
-                    <AgentCard key={agent.id} agent={agent} onStop={stopAgent} />
+                    <AgentCard key={agent.id} agent={agent} />
                   ))}
                 </div>
               </section>
@@ -136,7 +135,7 @@ export default function Dashboard() {
                 {sectionsOpen.completed && (
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-in fade-in-up duration-200">
                     {finished.map((agent) => (
-                      <AgentCard key={agent.id} agent={agent} onStop={stopAgent} />
+                      <AgentCard key={agent.id} agent={agent} />
                     ))}
                   </div>
                 )}
@@ -160,7 +159,7 @@ export default function Dashboard() {
                 {sectionsOpen.failed && (
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-in fade-in-up duration-200">
                     {failed.map((agent) => (
-                      <AgentCard key={agent.id} agent={agent} onStop={stopAgent} />
+                      <AgentCard key={agent.id} agent={agent} />
                     ))}
                   </div>
                 )}

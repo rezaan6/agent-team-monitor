@@ -10,12 +10,10 @@ alter table agents       add column if not exists user_id uuid references auth.u
 alter table agents       add column if not exists project text;
 alter table agent_events add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table agent_events add column if not exists project text;
-alter table stop_requests add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
 create index if not exists agents_user_idx        on agents (user_id, started_at desc);
 create index if not exists agents_user_project_idx on agents (user_id, project);
 create index if not exists events_user_idx        on agent_events (user_id, "timestamp" desc);
-create index if not exists stop_requests_user_idx on stop_requests (user_id);
 
 -- =============================================================================
 -- global_state: singleton -> per-user
@@ -120,17 +118,6 @@ create policy "users update own global_state"
   on global_state for update
   to authenticated
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
--- stop_requests (users can request stops for their own agents)
-create policy "users read own stop_requests"
-  on stop_requests for select
-  to authenticated
-  using (user_id = (select auth.uid()));
-
-create policy "users insert own stop_requests"
-  on stop_requests for insert
-  to authenticated
   with check (user_id = (select auth.uid()));
 
 -- ingest_tokens — users can see their own tokens (but we never expose the plaintext)

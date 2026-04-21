@@ -1,18 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, ChevronRight, Square, Clock, Cpu, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check } from "lucide-react";
+import { ChevronRight, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check } from "lucide-react";
 import type { Agent } from "@/lib/types";
 import { formatDuration, getAgentTypeColor, formatNumber } from "@/lib/formatters";
 
 interface AgentCardProps {
   agent: Agent;
-  onStop: (id: number) => void;
 }
 
-export function AgentCard({ agent, onStop }: AgentCardProps) {
+export function AgentCard({ agent }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [stopRequested, setStopRequested] = useState(false);
   const [elapsed, setElapsed] = useState("");
   const typeColor = getAgentTypeColor(agent.subagentType);
 
@@ -30,11 +28,6 @@ export function AgentCard({ agent, onStop }: AgentCardProps) {
       return () => clearInterval(interval);
     }
   }, [agent.elapsed, agent.startedAt, agent.status]);
-
-  const handleStop = () => {
-    setStopRequested(true);
-    onStop(agent.id);
-  };
 
   const promptPreview = agent.prompt.length > 150 ? agent.prompt.slice(0, 150) + "..." : agent.prompt;
 
@@ -134,24 +127,6 @@ export function AgentCard({ agent, onStop }: AgentCardProps) {
           </div>
         )}
       </div>
-
-      {/* Stop button */}
-      {agent.status === "running" && (
-        <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2">
-          <button
-            onClick={handleStop}
-            disabled={stopRequested}
-            className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform] duration-150 ${
-              stopRequested
-                ? "cursor-not-allowed bg-gray-50 dark:bg-gray-800 text-gray-400"
-                : "cursor-pointer text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-[0.98]"
-            }`}
-          >
-            <Square className="h-3 w-3" />
-            {stopRequested ? "Stopping..." : "Stop"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

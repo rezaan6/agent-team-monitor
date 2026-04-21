@@ -51,18 +51,6 @@ create table if not exists global_state (
 
 insert into global_state (id) values (1) on conflict (id) do nothing;
 
--- Stop requests queue — local hook scripts poll this
-create table if not exists stop_requests (
-  id          bigserial primary key,
-  agent_id    bigint not null,
-  requested_at timestamptz default now(),
-  consumed_at timestamptz
-);
-
-create index if not exists stop_requests_pending_idx
-  on stop_requests (requested_at desc)
-  where consumed_at is null;
-
 -- =============================================================================
 -- Realtime
 -- =============================================================================
@@ -79,7 +67,6 @@ alter publication supabase_realtime add table global_state;
 alter table agents enable row level security;
 alter table agent_events enable row level security;
 alter table global_state enable row level security;
-alter table stop_requests enable row level security;
 
 create policy "anon read agents"        on agents        for select using (true);
 create policy "anon read events"        on agent_events  for select using (true);

@@ -212,14 +212,6 @@ export function useAgentStream() {
     };
   }, []);
 
-  const stopAgent = useCallback(async (agentId: number) => {
-    try {
-      await fetch(`/api/stop/${agentId}`, { method: "POST" });
-    } catch (err) {
-      console.error("Failed to stop agent:", err);
-    }
-  }, []);
-
   const clearAll = useCallback(async () => {
     try {
       await fetch("/api/clear", { method: "POST" });
@@ -246,7 +238,6 @@ export function useAgentStream() {
     sessionStartedAt,
     connectionStatus,
     stats,
-    stopAgent,
     clearAll,
   };
 }

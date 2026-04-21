@@ -13,34 +13,12 @@ ENDPOINT="${BASE%/}/api/activity"
 PROJECT="${MONITOR_PROJECT:-}"
 TOKEN="${MONITOR_INGEST_TOKEN:-}"
 
-TMPFILE=$(mktemp)
-cat > "$TMPFILE"
-
-# Abort check — runs on PreToolUse only. If the dashboard's Stop button
-# was clicked for this agent, stop-signal-poller.sh will have dropped a
-# session-keyed signal file at /tmp/claude-stop-session-<id>. Exit code 2
-# on PreToolUse tells Claude Code to block the tool call and relay the
-# stderr message to the model, which prompts the sub-agent to stop.
-if [ "$PHASE" = "pre" ]; then
-  SID=$(/usr/bin/python3 -c "
-import sys, json
-try:
-    with open(sys.argv[1]) as f:
-        print(json.load(f).get('session_id', ''))
-except Exception:
-    pass
-" "$TMPFILE" 2>/dev/null)
-  if [ -n "$SID" ] && [ -f "/tmp/claude-stop-session-${SID}" ]; then
-    rm -f "$TMPFILE"
-    echo "Stop requested from the monitor dashboard. Aborting agent." >&2
-    exit 2
-  fi
-fi
-
 if [ -z "$TOKEN" ]; then
-  rm -f "$TMPFILE"
   exit 0
 fi
+
+TMPFILE=$(mktemp)
+cat > "$TMPFILE"
 
 export PHASE TMPFILE PROJECT
 PAYLOAD=$(/usr/bin/python3 << 'PYEOF'
