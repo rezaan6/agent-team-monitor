@@ -25,9 +25,11 @@ export function Toaster() {
       theme={theme}
       position="bottom-right"
       expand={false}
+      visibleToasts={6}
       richColors
       closeButton
       toastOptions={{
+        duration: 6000,
         classNames: {
           title: "text-sm",
           description: "text-sm",
