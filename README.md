@@ -21,7 +21,6 @@ Plus a rolling activity timeline and aggregate token/tool-use totals.
 - [lucide-react](https://lucide.dev/) icons
 - [Sonner](https://sonner.emilkowal.ski/) toasts
 - [Vercel](https://vercel.com/) hosting
-- [Playwright](https://playwright.dev/) for feature recordings
 
 ## Features (wait until GIFs load)
 

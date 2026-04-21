@@ -333,13 +333,18 @@ export async function processActivity(data: ActivityPayload, userId: string) {
 
 // --- Pending stop signals (polled by local hook scripts, scoped per user) ---
 
-export async function fetchAndConsumePendingStops(userId: string): Promise<number[]> {
+export interface PendingStop {
+  agentId: number;
+  sessionId: string | null;
+}
+
+export async function fetchAndConsumePendingStops(userId: string): Promise<PendingStop[]> {
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
 
   const { data: pending } = await supabase
     .from("stop_requests")
-    .select("id, agent_id")
+    .select("id, agent_id, agents:agent_id(session_id)")
     .eq("user_id", userId)
     .is("consumed_at", null)
     .order("requested_at", { ascending: true });
@@ -352,7 +357,11 @@ export async function fetchAndConsumePendingStops(userId: string): Promise<numbe
     .update({ consumed_at: nowIso })
     .in("id", ids);
 
-  return pending.map((p) => p.agent_id);
+  type Row = { agent_id: number; agents: { session_id: string | null } | null };
+  return (pending as unknown as Row[]).map((p) => ({
+    agentId: p.agent_id,
+    sessionId: p.agents?.session_id ?? null,
+  }));
 }
 
 // =============================================================================

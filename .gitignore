@@ -34,6 +34,7 @@ hook.backup.sh
 
 # Playwright recording intermediates (source webm/palette for docs/media GIFs)
 scripts/recordings/
+scripts/record-features.mjs
 
 # OS / editor
 .DS_Store

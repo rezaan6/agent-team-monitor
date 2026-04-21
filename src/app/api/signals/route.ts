@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * Polled by the local machine's stop-signal helper script.
- * Returns the agent IDs with pending stop requests (for the token's owner)
- * and marks them consumed.
+ * Returns pending stop requests (for the token's owner) as
+ * { agentId, sessionId } pairs and marks them consumed. The poller keys
+ * signal files by sessionId so PreToolUse hooks can match tool calls to
+ * the agent the user clicked Stop on.
  */
 export async function GET(req: Request) {
   const auth = await authorizeIngest(req);
@@ -16,6 +18,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const ids = await fetchAndConsumePendingStops(auth.userId);
-  return NextResponse.json({ stopAgentIds: ids });
+  const stops = await fetchAndConsumePendingStops(auth.userId);
+  return NextResponse.json({ stops });
 }
