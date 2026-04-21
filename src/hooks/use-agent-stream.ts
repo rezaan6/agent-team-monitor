@@ -1,20 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
 } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { toast } from "@/lib/toast";
 import type { Agent, AgentEvent, GlobalUsage } from "@/lib/types";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
-
-interface Toast {
-  id: number;
-  message: string;
-  type: "success" | "error" | "info";
-}
 
 interface AgentRow {
   id: number;
@@ -71,23 +66,6 @@ export function useAgentStream() {
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextToastId = useRef(0);
-
-  const addToast = useCallback(
-    (message: string, type: Toast["type"] = "info") => {
-      const id = nextToastId.current++;
-      setToasts((prev) => [...prev, { id, message, type }]);
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 4000);
-    },
-    []
-  );
-
-  const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,8 +120,8 @@ export function useAgentStream() {
         (agent.status === "completed" || agent.status === "error")
       ) {
         const desc = agent.description || `Agent #${agent.id}`;
-        if (agent.status === "completed") addToast(`${desc} completed`, "success");
-        else addToast(`${desc} failed`, "error");
+        if (agent.status === "completed") toast.success(`${desc} completed`);
+        else toast.error(`${desc} failed`);
       }
     }
 
@@ -232,7 +210,7 @@ export function useAgentStream() {
       authSub.subscription.unsubscribe();
       if (channel) supabase.removeChannel(channel);
     };
-  }, [addToast]);
+  }, []);
 
   const stopAgent = useCallback(async (agentId: number) => {
     try {
@@ -268,9 +246,7 @@ export function useAgentStream() {
     sessionStartedAt,
     connectionStatus,
     stats,
-    toasts,
     stopAgent,
     clearAll,
-    dismissToast,
   };
 }

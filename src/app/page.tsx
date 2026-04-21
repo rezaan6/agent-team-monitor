@@ -5,7 +5,6 @@ import { useAgentStream } from "@/hooks/use-agent-stream";
 import { Header } from "@/components/header";
 import { AgentCard } from "@/components/agent-card";
 import { Timeline } from "@/components/timeline";
-import { ToastContainer } from "@/components/toast";
 import { AgentGridSkeleton, SummarySkeleton, TimelineSkeleton } from "@/components/skeletons";
 import { Activity, PanelRightClose, PanelRightOpen, Loader2, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
 import type { Agent } from "@/lib/types";
@@ -44,10 +43,8 @@ export default function Dashboard() {
     sessionStartedAt,
     connectionStatus,
     stats,
-    toasts,
     stopAgent,
     clearAll,
-    dismissToast,
   } = useAgentStream();
 
   const [showTimeline, setShowTimeline] = useState(true);
@@ -230,8 +227,6 @@ export default function Dashboard() {
           Activity
         </button>
       </div>
-
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

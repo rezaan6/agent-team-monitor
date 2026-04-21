@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import { Toaster } from "@/components/sonner";
 
 export const metadata: Metadata = {
   title: "Agent Teams Monitor",
@@ -25,6 +26,7 @@ export default function RootLayout({
       </head>
       <body className="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased" suppressHydrationWarning>
         {children}
+        <Toaster />
       </body>
     </html>
   );
