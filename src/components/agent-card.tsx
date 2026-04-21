@@ -73,12 +73,11 @@ export function AgentCard({ agent, onStop }: AgentCardProps) {
         </h3>
 
         {/* Activity log */}
-        {agent.activityLog && agent.activityLog.length > 0 && (
-          <ActivityLog
-            activities={agent.activityLog}
-            isRunning={agent.status === "running"}
-          />
-        )}
+        <ActivityLog
+          activities={agent.activityLog ?? []}
+          isRunning={agent.status === "running"}
+        />
+
 
         {/* Status sentence */}
         <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
