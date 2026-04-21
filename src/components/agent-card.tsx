@@ -171,6 +171,11 @@ function ActivityLog({ activities, isRunning }: { activities: AgentActivity[]; i
         <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums">{activities.length}</span>
       </div>
       <div ref={scrollRef} className="h-36 overflow-y-auto">
+        {activities.length === 0 && (
+          <div className="flex h-full items-center justify-center px-2.5 py-2 text-[11px] italic text-gray-400 dark:text-gray-500">
+            {isRunning ? "Waiting for first step…" : "No activity yet"}
+          </div>
+        )}
         {activities.map((activity, idx) => {
           const isCurrent = isRunning && idx === activities.length - 1;
           return (
