@@ -21,6 +21,10 @@ export interface Agent {
   completedAt?: string;
   elapsed?: number;
   sessionId?: string;
+  /** Claude Code hook `cwd` — used to derive the human-readable session tag. */
+  cwd?: string;
+  /** Optional project tag set via the hook script's MONITOR_PROJECT env. */
+  project?: string;
   resultPreview?: string;
   usage?: AgentUsage;
   currentActivity?: AgentActivity;

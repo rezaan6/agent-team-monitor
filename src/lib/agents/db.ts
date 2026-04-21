@@ -19,6 +19,9 @@ interface AgentRow {
   completed_at: string | null;
   elapsed_ms: number | null;
   session_id: string | null;
+  // Added in migration 0003_agent_cwd.sql. Nullable so rows created before the
+  // migration still round-trip cleanly.
+  cwd: string | null;
   result_preview: string | null;
   usage: Agent["usage"] | null;
   current_activity: AgentActivity | null;
@@ -55,6 +58,8 @@ export function rowToAgent(row: AgentRow): Agent {
     completedAt: row.completed_at ?? undefined,
     elapsed: row.elapsed_ms ?? undefined,
     sessionId: row.session_id ?? undefined,
+    cwd: row.cwd ?? undefined,
+    project: row.project ?? undefined,
     resultPreview: row.result_preview ?? undefined,
     usage: row.usage ?? undefined,
     currentActivity: row.current_activity ?? undefined,
@@ -67,6 +72,13 @@ export function rowToAgent(row: AgentRow): Agent {
 export interface HookPayload {
   phase: "pre" | "post";
   project?: string;
+  /**
+   * Claude Code injects `cwd` into every hook payload — the absolute path of
+   * the repo the session was started in. We persist it so the dashboard can
+   * render a human-readable per-session badge on each agent card.
+   */
+  cwd?: string;
+  transcript_path?: string;
   tool_input?: {
     description?: string;
     prompt?: string;
@@ -190,6 +202,7 @@ export async function processHookEvent(
         background: toolInput.run_in_background || false,
         status: "running",
         session_id: sessionId,
+        cwd: hook.cwd ?? null,
         last_activity_at: nowIso,
       })
       .select()

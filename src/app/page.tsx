@@ -40,7 +40,6 @@ export default function Dashboard() {
   const {
     agents,
     events,
-    sessionStartedAt,
     connectionStatus,
     stats,
     clearAll,
@@ -94,10 +93,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50 dark:bg-gray-950">
-      <Header
-        connectionStatus={connectionStatus}
-        sessionStartedAt={sessionStartedAt}
-      />
+      <Header connectionStatus={connectionStatus} />
 
       <div className="relative flex-1 overflow-hidden">
         <main className={`h-full overflow-y-auto transition-[margin-right] duration-300 ease-out will-change-[margin-right] ${showTimeline ? "lg:mr-80" : ""}`}>

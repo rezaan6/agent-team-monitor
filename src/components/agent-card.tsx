@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronRight, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check } from "lucide-react";
 import type { Agent } from "@/lib/types";
 import { formatDuration, getAgentTypeColor, formatNumber } from "@/lib/formatters";
+import { getSessionTag } from "@/lib/agents/session-tag";
 
 interface AgentCardProps {
   agent: Agent;
@@ -13,6 +14,7 @@ export function AgentCard({ agent }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState("");
   const typeColor = getAgentTypeColor(agent.subagentType);
+  const sessionTag = getSessionTag(agent);
 
   useEffect(() => {
     const update = () => {
@@ -49,12 +51,18 @@ export function AgentCard({ agent }: AgentCardProps) {
       )}
 
       <div className="p-4">
-        {/* Header: type + id */}
-        <div className="mb-2 flex items-center gap-2 text-[11px]">
+        {/* Header: type + id + session tag */}
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
           <span className={`rounded-md px-1.5 py-0.5 font-medium ${typeColor}`}>
             {agent.subagentType || "general"}
           </span>
           <span className="text-gray-400 dark:text-gray-500">#{agent.id}</span>
+          <span
+            title={sessionTag.tooltip}
+            className={`max-w-[14rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium ring-1 ring-inset ${sessionTag.colorClasses}`}
+          >
+            {sessionTag.label}
+          </span>
           {agent.background && (
             <span className="text-gray-400 dark:text-gray-500">· background</span>
           )}

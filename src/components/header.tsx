@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, WifiOff, Moon, Sun } from "lucide-react";
-import { formatTime, formatTimeAgo } from "@/lib/formatters";
+import { formatTime } from "@/lib/formatters";
 import type { ConnectionStatus } from "@/hooks/use-agent-stream";
 import { UserMenu } from "@/components/user-menu";
 
 interface HeaderProps {
   connectionStatus: ConnectionStatus;
-  sessionStartedAt: string | null;
 }
 
-export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
+export function Header({ connectionStatus }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [sessionAge, setSessionAge] = useState("");
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -31,12 +29,9 @@ export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-      if (sessionStartedAt) {
-        setSessionAge(formatTimeAgo(sessionStartedAt));
-      }
     }, 1000);
     return () => clearInterval(interval);
-  }, [sessionStartedAt]);
+  }, []);
 
   return (
     <header className="shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -57,11 +52,6 @@ export function Header({ connectionStatus, sessionStartedAt }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div suppressHydrationWarning className="hidden text-right text-[11px] text-gray-500 dark:text-gray-400 sm:block">
             {currentTime && <span>{formatTime(currentTime)}</span>}
-            {sessionAge && (
-              <span className="ml-2 text-gray-400 dark:text-gray-500">
-                Session {sessionAge}
-              </span>
-            )}
           </div>
           <button
             onClick={toggleTheme}
