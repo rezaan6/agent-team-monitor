@@ -140,7 +140,11 @@ async function sweepStaleBackgroundAgents(userId: string) {
   const now = new Date().toISOString();
   for (const row of stale) {
     const elapsedMs = Date.now() - new Date(row.started_at).getTime();
-    await supabase
+    // .select() so we can embed the updated agent in the event payload.
+    // If the row was already completed by a concurrent path, the filter
+    // matches 0 rows — skip the event so the sidebar doesn't show a
+    // duplicate "Unknown agent" completion.
+    const { data: updated } = await supabase
       .from("agents")
       .update({
         status: "completed",
@@ -148,13 +152,17 @@ async function sweepStaleBackgroundAgents(userId: string) {
         elapsed_ms: elapsedMs,
       })
       .eq("id", row.id)
-      .eq("status", "running");
+      .eq("status", "running")
+      .select()
+      .maybeSingle();
+
+    if (!updated) continue;
 
     await supabase.from("agent_events").insert({
       type: "agent_completed",
       agent_id: row.id,
       user_id: userId,
-      payload: { reason: "inactivity_timeout" },
+      payload: { agent: rowToAgent(updated), reason: "inactivity_timeout" },
     });
   }
 }

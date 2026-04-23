@@ -201,7 +201,7 @@ export default function Dashboard() {
 
             {/* Mobile timeline */}
             <div className="lg:hidden">
-              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} />}
+              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} agents={agents} />}
             </div>
           </div>
         </main>
@@ -231,7 +231,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} embedded />}
+              {isInitialLoading ? <TimelineSkeleton /> : <Timeline events={events} agents={agents} embedded />}
             </div>
           </div>
         </aside>

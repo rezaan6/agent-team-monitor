@@ -1,14 +1,15 @@
 "use client";
 
 import { Zap, Play, CheckCircle, AlertCircle } from "lucide-react";
-import type { AgentEvent } from "@/lib/types";
+import type { Agent, AgentEvent } from "@/lib/types";
 
 interface TimelineProps {
   events: AgentEvent[];
+  agents: Map<number, Agent>;
   embedded?: boolean;
 }
 
-export function Timeline({ events, embedded }: TimelineProps) {
+export function Timeline({ events, agents, embedded }: TimelineProps) {
   const reversedEvents = [...events].reverse().slice(0, 50);
 
   if (reversedEvents.length === 0) {
@@ -24,7 +25,7 @@ export function Timeline({ events, embedded }: TimelineProps) {
     return (
       <div className="divide-y divide-gray-50 dark:divide-gray-800">
         {reversedEvents.map((event, idx) => (
-          <TimelineEvent key={`${event.agentId}-${event.type}-${idx}`} event={event} />
+          <TimelineEvent key={`${event.agentId}-${event.type}-${idx}`} event={event} agent={agents.get(event.agentId)} />
         ))}
       </div>
     );
@@ -41,7 +42,7 @@ export function Timeline({ events, embedded }: TimelineProps) {
       <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
         <div className="divide-y divide-gray-50 dark:divide-gray-800">
           {reversedEvents.map((event, idx) => (
-            <TimelineEvent key={`${event.agentId}-${event.type}-${idx}`} event={event} />
+            <TimelineEvent key={`${event.agentId}-${event.type}-${idx}`} event={event} agent={agents.get(event.agentId)} />
           ))}
         </div>
       </div>
@@ -49,7 +50,7 @@ export function Timeline({ events, embedded }: TimelineProps) {
   );
 }
 
-function TimelineEvent({ event }: { event: AgentEvent }) {
+function TimelineEvent({ event, agent }: { event: AgentEvent; agent: Agent | undefined }) {
   const time = new Date(event.timestamp).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -58,7 +59,12 @@ function TimelineEvent({ event }: { event: AgentEvent }) {
   });
 
   const isStarted = event.type === "agent_started";
-  const isError = event.agent?.status === "error";
+  // Prefer the per-event snapshot, fall back to the live agents map for
+  // events whose payload is missing the embedded agent (e.g. legacy rows
+  // or sweep-completed events written before the snapshot fix).
+  const description = event.agent?.description || agent?.description || "Unknown agent";
+  const status = event.agent?.status ?? agent?.status;
+  const isError = status === "error";
 
   return (
     <div className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/50 animate-in fade-in-up duration-200">
@@ -80,7 +86,7 @@ function TimelineEvent({ event }: { event: AgentEvent }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
           <span className="text-gray-400 dark:text-gray-500">#{event.agentId}</span>{" "}
-          {event.agent?.description || "Unknown agent"}
+          {description}
         </p>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
           {isStarted ? "Spawned" : isError ? "Failed" : "Completed"}
