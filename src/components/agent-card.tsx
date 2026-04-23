@@ -51,12 +51,11 @@ export function AgentCard({ agent }: AgentCardProps) {
       )}
 
       <div className="p-4">
-        {/* Header: type + id + session tag */}
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
+        {/* Header row 1 — primary identity: agent kind + project + bg flag */}
+        <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px]">
           <span className={`rounded-md px-1.5 py-0.5 font-medium ${typeColor}`}>
             {agent.subagentType || "general"}
           </span>
-          <span className="text-gray-400 dark:text-gray-500">#{agent.id}</span>
           {pills.project && (
             <span
               title={pills.project.tooltip}
@@ -65,15 +64,22 @@ export function AgentCard({ agent }: AgentCardProps) {
               {pills.project.label}
             </span>
           )}
+          {agent.background && (
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 ring-1 ring-inset ring-gray-200/70 dark:ring-gray-700/50">
+              background
+            </span>
+          )}
+        </div>
+        {/* Header row 2 — debug refs: agent id + session id (muted) */}
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500">
+          <span>#{agent.id}</span>
+          <span aria-hidden="true">·</span>
           <span
             title={pills.session.tooltip}
-            className={`max-w-[14rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium ring-1 ring-inset ${pills.session.colorClasses}`}
+            className={`max-w-[14rem] truncate rounded px-1.5 py-0.5 ${pills.session.colorClasses}`}
           >
             {pills.session.label}
           </span>
-          {agent.background && (
-            <span className="text-gray-400 dark:text-gray-500">· background</span>
-          )}
         </div>
 
         {/* Description — the hero */}
