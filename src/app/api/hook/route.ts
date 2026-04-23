@@ -14,7 +14,8 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as HookPayload;
     const project = body.project ?? auth.defaultProject ?? null;
-    const result = await processHookEvent(body, auth.userId, project);
+    const tagFallback = body.tag_fallback ?? null;
+    const result = await processHookEvent(body, auth.userId, project, tagFallback);
     return NextResponse.json(result || {});
   } catch (err) {
     return NextResponse.json(

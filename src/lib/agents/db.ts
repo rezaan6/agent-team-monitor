@@ -22,6 +22,8 @@ interface AgentRow {
   // Added in migration 0003_agent_cwd.sql. Nullable so rows created before the
   // migration still round-trip cleanly.
   cwd: string | null;
+  // Added in migration 0004_tag_fallback.sql.
+  tag_fallback: string | null;
   result_preview: string | null;
   usage: Agent["usage"] | null;
   current_activity: AgentActivity | null;
@@ -60,6 +62,7 @@ export function rowToAgent(row: AgentRow): Agent {
     sessionId: row.session_id ?? undefined,
     cwd: row.cwd ?? undefined,
     project: row.project ?? undefined,
+    tagFallback: row.tag_fallback ?? undefined,
     resultPreview: row.result_preview ?? undefined,
     usage: row.usage ?? undefined,
     currentActivity: row.current_activity ?? undefined,
@@ -73,9 +76,13 @@ export interface HookPayload {
   phase: "pre" | "post";
   project?: string;
   /**
+   * Optional label shown on the session pill only when `session_id` is missing.
+   * Injected by the hook script from the MONITOR_LABEL_FALLBACK env var.
+   */
+  tag_fallback?: string;
+  /**
    * Claude Code injects `cwd` into every hook payload — the absolute path of
-   * the repo the session was started in. We persist it so the dashboard can
-   * render a human-readable per-session badge on each agent card.
+   * the repo the session was started in. Surfaced in the session-pill tooltip.
    */
   cwd?: string;
   transcript_path?: string;
@@ -157,7 +164,8 @@ async function sweepStaleBackgroundAgents(userId: string) {
 export async function processHookEvent(
   hook: HookPayload,
   userId: string,
-  project: string | null
+  project: string | null,
+  tagFallback: string | null
 ) {
   const supabase = getSupabaseAdminClient();
   const toolInput = hook.tool_input ?? {};
@@ -203,6 +211,7 @@ export async function processHookEvent(
         status: "running",
         session_id: sessionId,
         cwd: hook.cwd ?? null,
+        tag_fallback: tagFallback,
         last_activity_at: nowIso,
       })
       .select()

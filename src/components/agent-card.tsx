@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronRight, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check } from "lucide-react";
 import type { Agent } from "@/lib/types";
 import { formatDuration, getAgentTypeColor, formatNumber } from "@/lib/formatters";
-import { getSessionTag } from "@/lib/agents/session-tag";
+import { getSessionPills } from "@/lib/agents/session-tag";
 
 interface AgentCardProps {
   agent: Agent;
@@ -14,7 +14,7 @@ export function AgentCard({ agent }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState("");
   const typeColor = getAgentTypeColor(agent.subagentType);
-  const sessionTag = getSessionTag(agent);
+  const pills = getSessionPills(agent);
 
   useEffect(() => {
     const update = () => {
@@ -57,11 +57,19 @@ export function AgentCard({ agent }: AgentCardProps) {
             {agent.subagentType || "general"}
           </span>
           <span className="text-gray-400 dark:text-gray-500">#{agent.id}</span>
+          {pills.project && (
+            <span
+              title={pills.project.tooltip}
+              className={`max-w-[14rem] truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${pills.project.colorClasses}`}
+            >
+              {pills.project.label}
+            </span>
+          )}
           <span
-            title={sessionTag.tooltip}
-            className={`max-w-[14rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium ring-1 ring-inset ${sessionTag.colorClasses}`}
+            title={pills.session.tooltip}
+            className={`max-w-[14rem] truncate rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium ring-1 ring-inset ${pills.session.colorClasses}`}
           >
-            {sessionTag.label}
+            {pills.session.label}
           </span>
           {agent.background && (
             <span className="text-gray-400 dark:text-gray-500">· background</span>

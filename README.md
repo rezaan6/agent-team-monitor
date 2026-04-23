@@ -80,6 +80,8 @@ Browser dashboard ◀──── Supabase Realtime ◀────────�
    ```
    supabase/migrations/0001_init.sql
    supabase/migrations/0002_auth_and_scoping.sql
+   supabase/migrations/0003_agent_cwd.sql
+   supabase/migrations/0004_tag_fallback.sql
    ```
 
 4. Seed a user + ingest token (plaintext token is printed once — save it):
@@ -110,12 +112,17 @@ Browser dashboard ◀──── Supabase Realtime ◀────────�
 
 On the machine running Claude Code, add the monitor URL and ingest token to `~/.claude/settings.json`:
 
+Each card shows two independent pills: a **project pill** (only if you set
+`MONITOR_PROJECT`) and a **session pill** (`sess-XXXXXX`, always rendered).
+They pick colours from disjoint palettes so you can tell them apart at a glance.
+
 ```json
 {
   "env": {
     "MONITOR_URL": "https://your-app.vercel.app",
     "MONITOR_INGEST_TOKEN": "<paste the token printed by seed-users.mjs>",
-    "MONITOR_PROJECT": "<short repo tag, optional>"
+    "MONITOR_PROJECT": "<short repo tag, optional — renders as the project pill>",
+    "MONITOR_LABEL_FALLBACK": "<optional — shown on the session pill only if session id is missing>"
   },
   "hooks": {
     "PreToolUse": [

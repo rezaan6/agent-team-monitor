@@ -22,6 +22,9 @@ interface AgentRow {
   completed_at: string | null;
   elapsed_ms: number | null;
   session_id: string | null;
+  cwd: string | null;
+  project: string | null;
+  tag_fallback: string | null;
   result_preview: string | null;
   usage: Agent["usage"] | null;
   current_activity: Agent["currentActivity"] | null;
@@ -48,6 +51,9 @@ function rowToAgent(row: AgentRow): Agent {
     completedAt: row.completed_at ?? undefined,
     elapsed: row.elapsed_ms ?? undefined,
     sessionId: row.session_id ?? undefined,
+    cwd: row.cwd ?? undefined,
+    project: row.project ?? undefined,
+    tagFallback: row.tag_fallback ?? undefined,
     resultPreview: row.result_preview ?? undefined,
     usage: row.usage ?? undefined,
     currentActivity: row.current_activity ?? undefined,

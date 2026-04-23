@@ -21,10 +21,12 @@ export interface Agent {
   completedAt?: string;
   elapsed?: number;
   sessionId?: string;
-  /** Claude Code hook `cwd` — used to derive the human-readable session tag. */
+  /** Claude Code hook `cwd` — surfaced in the session-pill tooltip. */
   cwd?: string;
-  /** Optional project tag set via the hook script's MONITOR_PROJECT env. */
+  /** Optional project label set via MONITOR_PROJECT. Rendered as its own pill. */
   project?: string;
+  /** Optional label used on the session pill when sessionId is missing. */
+  tagFallback?: string;
   resultPreview?: string;
   usage?: AgentUsage;
   currentActivity?: AgentActivity;
