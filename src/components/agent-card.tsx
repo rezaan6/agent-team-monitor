@@ -14,13 +14,24 @@ export function AgentCard({ agent }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const typeColor = getAgentTypeColor(agent.subagentType);
   const pills = getSessionPills(agent);
 
-  async function handleForceCancel() {
+  function openCancelDialog() {
+    setCancelError(null);
+    dialogRef.current?.showModal();
+  }
+
+  function closeCancelDialog() {
+    dialogRef.current?.close();
+  }
+
+  async function confirmForceCancel() {
     if (cancelling) return;
-    if (!confirm(`Force cancel agent #${agent.id}? This marks it completed in the database.`)) return;
     setCancelling(true);
+    setCancelError(null);
     try {
       const res = await fetch("/api/cancel-agent", {
         method: "POST",
@@ -28,11 +39,15 @@ export function AgentCard({ agent }: AgentCardProps) {
         body: JSON.stringify({ agentId: agent.id }),
       });
       if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: "request failed" }));
-        alert(`Cancel failed: ${error ?? res.statusText}`);
+        const { error } = await res
+          .json()
+          .catch(() => ({ error: "request failed" }));
+        setCancelError(error ?? res.statusText);
+        return;
       }
+      closeCancelDialog();
     } catch (err) {
-      alert(`Cancel failed: ${(err as Error).message}`);
+      setCancelError((err as Error).message);
     } finally {
       setCancelling(false);
     }
@@ -152,13 +167,12 @@ export function AgentCard({ agent }: AgentCardProps) {
             </button>
             {agent.status === "running" && (
               <button
-                onClick={handleForceCancel}
-                disabled={cancelling}
-                className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-[background-color,color] duration-150 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Mark this agent as completed in the database"
+                onClick={openCancelDialog}
+                className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-[background-color,color] duration-150 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                title="Mark this agent as completed in the dashboard database"
               >
                 <Ban className="h-3 w-3" />
-                {cancelling ? "Cancelling…" : "Force cancel"}
+                Force cancel
               </button>
             )}
           </div>
@@ -174,16 +188,72 @@ export function AgentCard({ agent }: AgentCardProps) {
           )}
         </div>
 
-        {/* Result */}
-        {agent.resultPreview && (
+        {/* Result / Force-cancel banner */}
+        {agent.cancelled ? (
+          <div className="mt-3 rounded-lg bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-3 animate-in fade-in-up duration-300">
+            <p className="text-[11px] font-medium text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1">
+              <Ban className="h-3 w-3" />
+              Force cancelled
+            </p>
+            <p className="text-[11px] leading-relaxed text-blue-900/70 dark:text-blue-300/70">
+              Marked completed from the dashboard. Any live CLI session for this agent keeps running — stop it in your terminal if needed.
+            </p>
+          </div>
+        ) : agent.resultPreview ? (
           <div className="mt-3 rounded-lg bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-3 animate-in fade-in-up duration-300">
             <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 mb-1">Result</p>
             <p className="text-[11px] leading-relaxed text-emerald-900/70 dark:text-emerald-300/70 line-clamp-4">
               {agent.resultPreview}
             </p>
           </div>
-        )}
+        ) : null}
       </div>
+
+      <dialog
+        ref={dialogRef}
+        onClick={(e) => {
+          if (e.target === dialogRef.current) closeCancelDialog();
+        }}
+        className="backdrop:bg-gray-900/40 backdrop:backdrop-blur-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-0 shadow-xl max-w-sm w-[calc(100%-2rem)] open:animate-in open:fade-in-up open:duration-150"
+      >
+        <div className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <Ban className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Force cancel agent #{agent.id}?
+            </h2>
+          </div>
+          <p className="mb-4 text-[12px] leading-relaxed text-gray-600 dark:text-gray-400">
+            This marks the agent as completed in the dashboard database so the card un-freezes. It does <span className="font-medium text-gray-900 dark:text-gray-200">not</span> stop a Claude Code session that may still be running in your terminal — stop that with Ctrl-C or <span className="font-mono">/exit</span>.
+          </p>
+          {cancelError && (
+            <p className="mb-3 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-2.5 py-1.5 text-[11px] text-red-700 dark:text-red-400">
+              {cancelError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeCancelDialog}
+              disabled={cancelling}
+              className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Keep running
+            </button>
+            <button
+              type="button"
+              onClick={confirmForceCancel}
+              disabled={cancelling}
+              className="cursor-pointer flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Ban className="h-3 w-3" />
+              {cancelling ? "Cancelling…" : "Force cancel"}
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

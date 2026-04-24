@@ -17,6 +17,7 @@ export interface Agent {
   subagentType: string;
   background: boolean;
   status: "running" | "completed" | "error";
+  cancelled?: boolean;
   startedAt: string;
   completedAt?: string;
   elapsed?: number;

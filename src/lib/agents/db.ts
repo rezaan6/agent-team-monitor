@@ -15,6 +15,7 @@ interface AgentRow {
   subagent_type: string;
   background: boolean;
   status: "running" | "completed" | "error";
+  cancelled: boolean | null;
   started_at: string;
   completed_at: string | null;
   elapsed_ms: number | null;
@@ -56,6 +57,7 @@ export function rowToAgent(row: AgentRow): Agent {
     subagentType: row.subagent_type ?? "general-purpose",
     background: row.background ?? false,
     status: row.status,
+    cancelled: row.cancelled ?? false,
     startedAt: row.started_at,
     completedAt: row.completed_at ?? undefined,
     elapsed: row.elapsed_ms ?? undefined,
@@ -422,6 +424,7 @@ export async function cancelAgent(supabase: SupabaseClient, agentId: number) {
     .from("agents")
     .update({
       status: "completed",
+      cancelled: true,
       completed_at: nowIso,
       elapsed_ms: elapsedMs,
       last_activity_at: nowIso,
