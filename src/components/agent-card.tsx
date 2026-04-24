@@ -214,7 +214,7 @@ export function AgentCard({ agent }: AgentCardProps) {
         onClick={(e) => {
           if (e.target === dialogRef.current) closeCancelDialog();
         }}
-        className="backdrop:bg-gray-900/40 backdrop:backdrop-blur-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-0 shadow-xl max-w-sm w-[calc(100%-2rem)] open:animate-in open:fade-in-up open:duration-150"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 backdrop:bg-gray-900/40 backdrop:backdrop-blur-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-0 shadow-xl max-w-sm w-[calc(100%-2rem)] open:animate-in open:fade-in-up open:duration-150"
       >
         <div className="p-5">
           <div className="mb-3 flex items-center gap-2">
