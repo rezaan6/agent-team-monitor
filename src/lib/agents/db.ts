@@ -397,6 +397,53 @@ export async function processActivity(data: ActivityPayload, userId: string) {
 // even a buggy query here cannot return another user's rows.
 // =============================================================================
 
+export async function cancelAgent(supabase: SupabaseClient, agentId: number) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("unauthenticated");
+
+  const admin = getSupabaseAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const { data: row } = await admin
+    .from("agents")
+    .select("started_at")
+    .eq("id", agentId)
+    .eq("user_id", user.id)
+    .eq("status", "running")
+    .maybeSingle();
+
+  if (!row) return { cancelled: false };
+
+  const elapsedMs = Date.now() - new Date(row.started_at).getTime();
+
+  const { data: updated } = await admin
+    .from("agents")
+    .update({
+      status: "completed",
+      completed_at: nowIso,
+      elapsed_ms: elapsedMs,
+      last_activity_at: nowIso,
+    })
+    .eq("id", agentId)
+    .eq("user_id", user.id)
+    .eq("status", "running")
+    .select()
+    .maybeSingle();
+
+  if (!updated) return { cancelled: false };
+
+  await admin.from("agent_events").insert({
+    type: "agent_completed",
+    agent_id: agentId,
+    user_id: user.id,
+    payload: { agent: rowToAgent(updated), reason: "manual_cancel" },
+  });
+
+  return { cancelled: true };
+}
+
 export async function clearAllState(supabase: SupabaseClient) {
   const {
     data: { user },

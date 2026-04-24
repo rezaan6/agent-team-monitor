@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check } from "lucide-react";
+import { ChevronRight, Wrench, FileText, Pencil, Terminal, Search, FolderSearch, Globe, Check, Ban } from "lucide-react";
 import type { Agent } from "@/lib/types";
 import { formatDuration, getAgentTypeColor, formatNumber } from "@/lib/formatters";
 import { getSessionPills } from "@/lib/agents/session-tag";
@@ -13,8 +13,30 @@ interface AgentCardProps {
 export function AgentCard({ agent }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const typeColor = getAgentTypeColor(agent.subagentType);
   const pills = getSessionPills(agent);
+
+  async function handleForceCancel() {
+    if (cancelling) return;
+    if (!confirm(`Force cancel agent #${agent.id}? This marks it completed in the database.`)) return;
+    setCancelling(true);
+    try {
+      const res = await fetch("/api/cancel-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: agent.id }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "request failed" }));
+        alert(`Cancel failed: ${error ?? res.statusText}`);
+      }
+    } catch (err) {
+      alert(`Cancel failed: ${(err as Error).message}`);
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   useEffect(() => {
     const update = () => {
@@ -120,13 +142,26 @@ export function AgentCard({ agent }: AgentCardProps) {
 
         {/* Prompt preview / expandable */}
         <div className="mb-1">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-[background-color,color] duration-150 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-          >
-            <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
-            Task details
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-[background-color,color] duration-150 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            >
+              <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
+              Task details
+            </button>
+            {agent.status === "running" && (
+              <button
+                onClick={handleForceCancel}
+                disabled={cancelling}
+                className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-[background-color,color] duration-150 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Mark this agent as completed in the database"
+              >
+                <Ban className="h-3 w-3" />
+                {cancelling ? "Cancelling…" : "Force cancel"}
+              </button>
+            )}
+          </div>
           {!expanded && (
             <p className="mt-1 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500 line-clamp-2 animate-in fade-in duration-200">
               {promptPreview}
