@@ -64,28 +64,39 @@ export default function Dashboard() {
   // (sessionId, description) and started within 5s of each other, they
   // represent the same spawn that leaked past the server-side dedupe (e.g.
   // an existing row from before the dedupe was deployed). Keep the earliest
-  // id so the visible card stays stable.
+  // id so the visible card stays stable. Rows that share the key but are
+  // outside the window are legitimate re-spawns of the same task and must
+  // both be kept.
   const DEDUPE_WINDOW_MS = 5_000;
   const rawAgents = Array.from(agents.values());
   const dedupeKey = (a: Agent) =>
     `${a.sessionId ?? "unknown"}::${a.description}`;
-  const keeperById = new Map<string, Agent>();
+  const grouped = new Map<string, Agent[]>();
   for (const a of rawAgents) {
     const key = dedupeKey(a);
-    const existing = keeperById.get(key);
-    if (!existing) {
-      keeperById.set(key, a);
+    const list = grouped.get(key);
+    if (list) list.push(a);
+    else grouped.set(key, [a]);
+  }
+  const allAgents: Agent[] = [];
+  for (const group of grouped.values()) {
+    if (group.length === 1) {
+      allAgents.push(group[0]);
       continue;
     }
-    const aStart = new Date(a.startedAt).getTime();
-    const exStart = new Date(existing.startedAt).getTime();
-    const withinWindow = Math.abs(aStart - exStart) < DEDUPE_WINDOW_MS;
-    if (!withinWindow) continue;
-    // Prefer the lowest-id row as the canonical one, since it was the
-    // winner of the server-side dedupe race.
-    if (a.id < existing.id) keeperById.set(key, a);
+    // Walk in id order so the server-side dedupe winner is considered first;
+    // drop any later row that started within the window of an already-kept row.
+    const sorted = [...group].sort((a, b) => a.id - b.id);
+    const kept: Agent[] = [];
+    for (const candidate of sorted) {
+      const cStart = new Date(candidate.startedAt).getTime();
+      const isLeak = kept.some(
+        (k) => Math.abs(cStart - new Date(k.startedAt).getTime()) < DEDUPE_WINDOW_MS,
+      );
+      if (!isLeak) kept.push(candidate);
+    }
+    allAgents.push(...kept);
   }
-  const allAgents = Array.from(keeperById.values());
   const running = allAgents.filter((a) => a.status === "running");
   const finished = allAgents
     .filter((a) => a.status === "completed")
