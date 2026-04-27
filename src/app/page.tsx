@@ -9,8 +9,7 @@ import { AgentGridSkeleton, SummarySkeleton, TimelineSkeleton } from "@/componen
 import { Activity, PanelRightClose, PanelRightOpen, Loader2, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
 import type { Agent } from "@/lib/types";
 
-function summarizeActivity(agents: Map<number, Agent>): string {
-  const all = Array.from(agents.values());
+function summarizeActivity(all: Agent[]): string {
   const running = all.filter((a) => a.status === "running");
   const completed = all.filter((a) => a.status === "completed");
   const errors = all.filter((a) => a.status === "error");
@@ -60,43 +59,7 @@ export default function Dashboard() {
 
   const isInitialLoading = connectionStatus === "connecting" && agents.size === 0;
 
-  // Render-layer dedupe: if two rows with different ids share the same
-  // (sessionId, description) and started within 5s of each other, they
-  // represent the same spawn that leaked past the server-side dedupe (e.g.
-  // an existing row from before the dedupe was deployed). Keep the earliest
-  // id so the visible card stays stable. Rows that share the key but are
-  // outside the window are legitimate re-spawns of the same task and must
-  // both be kept.
-  const DEDUPE_WINDOW_MS = 5_000;
-  const rawAgents = Array.from(agents.values());
-  const dedupeKey = (a: Agent) =>
-    `${a.sessionId ?? "unknown"}::${a.description}`;
-  const grouped = new Map<string, Agent[]>();
-  for (const a of rawAgents) {
-    const key = dedupeKey(a);
-    const list = grouped.get(key);
-    if (list) list.push(a);
-    else grouped.set(key, [a]);
-  }
-  const allAgents: Agent[] = [];
-  for (const group of grouped.values()) {
-    if (group.length === 1) {
-      allAgents.push(group[0]);
-      continue;
-    }
-    // Walk in id order so the server-side dedupe winner is considered first;
-    // drop any later row that started within the window of an already-kept row.
-    const sorted = [...group].sort((a, b) => a.id - b.id);
-    const kept: Agent[] = [];
-    for (const candidate of sorted) {
-      const cStart = new Date(candidate.startedAt).getTime();
-      const isLeak = kept.some(
-        (k) => Math.abs(cStart - new Date(k.startedAt).getTime()) < DEDUPE_WINDOW_MS,
-      );
-      if (!isLeak) kept.push(candidate);
-    }
-    allAgents.push(...kept);
-  }
+  const allAgents = Array.from(agents.values());
   const running = allAgents.filter((a) => a.status === "running");
   const finished = allAgents
     .filter((a) => a.status === "completed")
@@ -118,7 +81,7 @@ export default function Dashboard() {
             ) : (
               <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-5 py-4 animate-in fade-in-scale duration-300">
                 <div className="flex items-start justify-between gap-4">
-                  <p className="max-h-20 overflow-y-auto text-sm leading-relaxed text-gray-600 dark:text-gray-400">{summarizeActivity(agents)}</p>
+                  <p className="max-h-20 overflow-y-auto text-sm leading-relaxed text-gray-600 dark:text-gray-400">{summarizeActivity(allAgents)}</p>
                   {running.length > 0 && (
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-600/10 dark:ring-blue-400/10 animate-in fade-in duration-300">
                       <span className="relative flex h-1.5 w-1.5">
