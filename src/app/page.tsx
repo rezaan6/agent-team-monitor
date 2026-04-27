@@ -43,6 +43,9 @@ export default function Dashboard() {
     connectionStatus,
     stats,
     clearAll,
+    hasMoreTerminal,
+    isLoadingMore,
+    loadMore,
   } = useAgentStream();
 
   const [showTimeline, setShowTimeline] = useState(true);
@@ -185,6 +188,26 @@ export default function Dashboard() {
                   </div>
                 )}
               </section>
+            )}
+
+            {/* Load older terminal agents — keyset-paginated via /api/agents */}
+            {hasMoreTerminal && (finished.length > 0 || failed.length > 0) && (
+              <div className="flex justify-center pt-1">
+                <button
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm transition-[background-color,opacity,transform] duration-150 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading older agents…
+                    </>
+                  ) : (
+                    <>Load older agents</>
+                  )}
+                </button>
+              </div>
             )}
 
             {allAgents.length === 0 && !isInitialLoading && (

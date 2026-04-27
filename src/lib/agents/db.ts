@@ -469,9 +469,27 @@ export async function clearAllState(supabase: SupabaseClient) {
     .eq("user_id", user.id);
 }
 
+// Initial snapshot loads ALL running agents (bounded — they're live) plus the
+// most recent N terminal agents. Older terminal pages are fetched on demand
+// via getOlderTerminalAgents (keyset pagination on started_at).
+const INITIAL_TERMINAL_LIMIT = 100;
+const TERMINAL_PAGE_LIMIT = 50;
+const TERMINAL_PAGE_LIMIT_MAX = 200;
+
 export async function getInitialSnapshot(supabase: SupabaseClient) {
-  const [agentsRes, eventsRes, gsRes] = await Promise.all([
-    supabase.from("agents").select("*").order("started_at", { ascending: true }),
+  const [runningRes, terminalRes, eventsRes, gsRes] = await Promise.all([
+    supabase
+      .from("agents")
+      .select("*")
+      .eq("status", "running")
+      .order("started_at", { ascending: true }),
+    // Fetch one extra row to detect whether more pages exist without a count.
+    supabase
+      .from("agents")
+      .select("*")
+      .in("status", ["completed", "error"])
+      .order("started_at", { ascending: false })
+      .limit(INITIAL_TERMINAL_LIMIT + 1),
     supabase
       .from("agent_events")
       .select("*")
@@ -480,8 +498,22 @@ export async function getInitialSnapshot(supabase: SupabaseClient) {
     supabase.from("global_state").select("*").maybeSingle(),
   ]);
 
+  const running = (runningRes.data ?? []).map(rowToAgent);
+  const terminalRows = terminalRes.data ?? [];
+  const hasMoreTerminal = terminalRows.length > INITIAL_TERMINAL_LIMIT;
+  const visibleTerminal = hasMoreTerminal
+    ? terminalRows.slice(0, INITIAL_TERMINAL_LIMIT)
+    : terminalRows;
+  const terminal = visibleTerminal.map(rowToAgent);
+  const oldestTerminalStartedAt =
+    visibleTerminal.length > 0
+      ? visibleTerminal[visibleTerminal.length - 1].started_at
+      : null;
+
   return {
-    agents: (agentsRes.data ?? []).map(rowToAgent),
+    agents: [...running, ...terminal],
+    hasMoreTerminal,
+    oldestTerminalStartedAt,
     events: (eventsRes.data ?? []).map((e) => ({
       type: e.type,
       agentId: e.agent_id,
@@ -496,4 +528,32 @@ export async function getInitialSnapshot(supabase: SupabaseClient) {
     },
     sessionStartedAt: gsRes.data?.session_started_at ?? new Date().toISOString(),
   };
+}
+
+export async function getOlderTerminalAgents(
+  supabase: SupabaseClient,
+  before: string,
+  limit: number = TERMINAL_PAGE_LIMIT
+) {
+  const safeLimit = Math.min(
+    Math.max(1, Math.floor(limit)),
+    TERMINAL_PAGE_LIMIT_MAX
+  );
+
+  const { data } = await supabase
+    .from("agents")
+    .select("*")
+    .in("status", ["completed", "error"])
+    .lt("started_at", before)
+    .order("started_at", { ascending: false })
+    .limit(safeLimit + 1);
+
+  const rows = data ?? [];
+  const hasMore = rows.length > safeLimit;
+  const visible = hasMore ? rows.slice(0, safeLimit) : rows;
+  const agents = visible.map(rowToAgent);
+  const oldestTerminalStartedAt =
+    visible.length > 0 ? visible[visible.length - 1].started_at : before;
+
+  return { agents, hasMore, oldestTerminalStartedAt };
 }

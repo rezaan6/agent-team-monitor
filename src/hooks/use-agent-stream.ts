@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
@@ -72,6 +72,9 @@ export function useAgentStream() {
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
+  const [hasMoreTerminal, setHasMoreTerminal] = useState(false);
+  const [terminalCursor, setTerminalCursor] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +108,8 @@ export function useAgentStream() {
         setEvents((data.events as AgentEvent[]) ?? []);
         if (data.usage) setUsage(data.usage as GlobalUsage);
         if (data.sessionStartedAt) setSessionStartedAt(data.sessionStartedAt);
+        setHasMoreTerminal(Boolean(data.hasMoreTerminal));
+        setTerminalCursor(data.oldestTerminalStartedAt ?? null);
         setConnectionStatus("connected");
       } catch (err) {
         console.error("Failed to hydrate initial state:", err);
@@ -226,6 +231,49 @@ export function useAgentStream() {
     }
   }, []);
 
+  // Cursor lives in a ref so rapid loadMore clicks always read the latest
+  // value, not a stale closure capture between paint and re-render. The
+  // loading guard is also a ref so concurrent clicks short-circuit
+  // synchronously, before React batches the state update.
+  const cursorRef = useRef<string | null>(null);
+  const loadingRef = useRef(false);
+  useEffect(() => {
+    cursorRef.current = terminalCursor;
+  }, [terminalCursor]);
+
+  const loadMore = useCallback(async () => {
+    const cursor = cursorRef.current;
+    if (!cursor || loadingRef.current) return;
+    loadingRef.current = true;
+    setIsLoadingMore(true);
+    try {
+      const url = `/api/agents?before=${encodeURIComponent(cursor)}&limit=50`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`load more failed: ${res.status}`);
+      const data = (await res.json()) as {
+        agents: Agent[];
+        hasMore: boolean;
+        oldestTerminalStartedAt: string | null;
+      };
+      setAgents((prev) => {
+        const next = new Map(prev);
+        for (const a of data.agents ?? []) {
+          // Don't overwrite a fresher in-memory copy (e.g. a row that was
+          // running when first loaded and has since been updated by realtime).
+          if (!next.has(a.id)) next.set(a.id, a);
+        }
+        return next;
+      });
+      setHasMoreTerminal(Boolean(data.hasMore));
+      setTerminalCursor(data.oldestTerminalStartedAt ?? null);
+    } catch (err) {
+      console.error("Failed to load older agents:", err);
+    } finally {
+      loadingRef.current = false;
+      setIsLoadingMore(false);
+    }
+  }, []);
+
   const stats = {
     running: Array.from(agents.values()).filter((a) => a.status === "running")
       .length,
@@ -245,5 +293,8 @@ export function useAgentStream() {
     connectionStatus,
     stats,
     clearAll,
+    hasMoreTerminal,
+    isLoadingMore,
+    loadMore,
   };
 }
