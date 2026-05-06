@@ -1,0 +1,31 @@
+name: Keep Supabase awake
+
+# Pings the deployed /api/healthcheck endpoint twice a week so the Supabase
+# free-tier project doesn't auto-pause after 7 days of DB inactivity.
+#
+# Setup: add a repo secret KEEP_ALIVE_URL pointing at the deployed healthcheck,
+# e.g. https://your-app.vercel.app/api/healthcheck
+
+on:
+  schedule:
+    # Mon and Thu at 12:00 UTC — well inside the 7-day pause window.
+    - cron: "0 12 * * 1,4"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping healthcheck
+        env:
+          KEEP_ALIVE_URL: ${{ secrets.KEEP_ALIVE_URL }}
+        run: |
+          if [ -z "$KEEP_ALIVE_URL" ]; then
+            echo "KEEP_ALIVE_URL secret is not set" >&2
+            exit 1
+          fi
+          response=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 30 "$KEEP_ALIVE_URL")
+          echo "HTTP $response"
+          cat /tmp/body
+          echo
+          [ "$response" = "200" ]

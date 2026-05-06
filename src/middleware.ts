@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/api/hook",
   "/api/activity",
   "/api/signals",
+  "/api/healthcheck",
 ];
 
 function isPublic(pathname: string) {
