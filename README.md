@@ -108,6 +108,23 @@ Browser dashboard ◀──── Supabase Realtime ◀────────�
    - `SUPABASE_SERVICE_ROLE_KEY`
 4. Deploy.
 
+## Keeping Supabase awake (free tier)
+
+Supabase free-tier projects auto-pause after ~7 days of zero database activity, which takes the deployment offline until you click *Resume project* in the Supabase dashboard.
+
+This repo ships a workaround:
+
+- `src/app/api/healthcheck/route.ts` — public endpoint that runs a trivial query against `agents`, so hitting it counts as real DB activity.
+- `.github/workflows/keep-alive.yml` — GitHub Actions cron that pings the endpoint Mon + Thu at 12:00 UTC, well inside the 7-day window.
+
+To activate after you fork or clone:
+
+1. Open repo `Settings → Secrets and variables → Actions → New repository secret`.
+2. Name `KEEP_ALIVE_URL`, value `https://<your-vercel-url>/api/healthcheck`.
+3. Trigger the workflow once manually from the Actions tab to confirm it returns HTTP 200.
+
+If you upgrade to Supabase Pro the auto-pause goes away and you can delete the workflow.
+
 ## Connecting Claude Code to a deployed monitor
 
 On the machine running Claude Code, add the monitor URL and ingest token to `~/.claude/settings.json`:
